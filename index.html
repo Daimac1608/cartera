@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d3557">
+<meta name="robots" content="noindex, nofollow">
+<title>Cartera de Clientes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cartera">
+<style>
+:root{
+  --azul:#1d3557; --azul2:#2b4a75; --fondo:#f4f6f8; --tarjeta:#fff; --texto:#1b1f24; --suave:#5d6773;
+  --borde:#dfe3e8; --verde:#0a7a35; --verde-f:#e3f5ea; --rojo:#b42318; --rojo-f:#fde4e1;
+  --ambar:#9a6700; --ambar-f:#fff4cc; --oro:#e9b949; --radio:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--texto);
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.oculto{display:none!important}
+.contenedor{max-width:760px;margin:0 auto;padding:0 16px}
+
+/* Encabezado */
+header{background:var(--azul);color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 0 12px;position:sticky;top:0;z-index:5}
+.barra{display:flex;align-items:center;gap:10px}
+.barra img{width:34px;height:34px;border-radius:8px}
+.barra h1{font-size:19px;margin:0;flex:1}
+.icono-btn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:8px 12px;font-weight:600}
+.totales{display:flex;gap:8px;margin-top:10px}
+.totales div{flex:1;background:rgba(255,255,255,.1);border-radius:10px;padding:6px 10px}
+.totales small{display:block;color:#cfe3ff;font-size:12px}
+.totales b{font-size:16px}
+
+/* Pestañas */
+.pestanas{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+.pestanas button{flex:1 0 auto;border:1px solid var(--borde);background:#fff;border-radius:999px;padding:8px 14px;font-weight:600;color:var(--suave);white-space:nowrap}
+.pestanas button small{font-weight:500}
+.pestanas button.activa{background:var(--azul);border-color:var(--azul);color:#fff}
+
+.resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.resumen div{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:8px 10px}
+.resumen small{display:block;color:var(--suave);font-size:12px}
+.resumen b{font-size:15px}
+@media (max-width:520px){.resumen{grid-template-columns:repeat(2,1fr)}.pestanas button{padding:8px 10px}.pestanas small{display:none}}
+
+.acciones{display:flex;gap:8px;margin:6px 0 12px}
+.acciones input{flex:1;min-width:0;border:1px solid var(--borde);border-radius:12px;padding:10px 12px;background:#fff}
+.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:700;background:#e9edf2;color:var(--texto)}
+.btn.primario{background:var(--azul);color:#fff}
+.btn.verde{background:var(--verde);color:#fff}
+.btn.rojo{background:var(--rojo);color:#fff}
+.btn.suave-rojo{background:var(--rojo-f);color:var(--rojo)}
+.btn:disabled{opacity:.6}
+
+/* Tarjetas */
+.lista{display:flex;flex-direction:column;gap:10px;padding-bottom:calc(env(safe-area-inset-bottom) + 30px)}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-left:5px solid var(--borde);border-radius:var(--radio);padding:12px 14px}
+.tarjeta.vencido{border-left-color:var(--rojo);background:#fffafa}
+.tarjeta.pronto{border-left-color:#e3a008}
+.tarjeta.pagado{border-left-color:var(--verde)}
+.t-arriba{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.t-nombre{font-weight:700;font-size:17px;background:none;border:0;padding:0;text-align:left}
+.t-tel{font-size:13px;color:var(--suave)}
+.t-tel a{color:var(--azul2)}
+.chip{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:#eef1f5;color:var(--suave)}
+.chip.vencido{background:var(--rojo-f);color:var(--rojo)}
+.chip.pronto{background:var(--ambar-f);color:var(--ambar)}
+.chip.pagado{background:var(--verde-f);color:var(--verde)}
+.t-datos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+.t-datos small{display:block;color:var(--suave);font-size:12px}
+.t-datos b{font-size:15px}
+.t-datos .debe b{color:var(--azul)}
+.t-botones{display:flex;gap:8px}
+.t-botones .btn{flex:1;padding:9px 8px}
+.vacio{text-align:center;color:var(--suave);padding:40px 10px;background:#fff;border:1px dashed var(--borde);border-radius:var(--radio)}
+.leyenda{font-size:12px;color:var(--suave);margin:4px 0 10px}
+
+/* Ventanas (hojas) */
+.fondo-modal{position:fixed;inset:0;background:rgba(10,20,35,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.hoja{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px)}
+@media (min-width:600px){.fondo-modal{align-items:center}.hoja{border-radius:18px}}
+.hoja h2{margin:0 0 4px;font-size:19px}
+.hoja .sub{color:var(--suave);font-size:14px;margin:0 0 12px}
+.campo{display:block;margin:10px 0}
+.campo span{display:block;font-size:13px;color:var(--suave);margin-bottom:4px;font-weight:600}
+.campo input,.campo textarea{width:100%;border:1px solid var(--borde);border-radius:12px;padding:11px 12px;background:#fff;font-size:16px}
+.aviso{font-weight:700;margin:10px 0;padding:10px 12px;border-radius:12px;background:var(--verde-f);color:var(--verde)}
+.aviso.rojo{background:var(--rojo-f);color:var(--rojo)}
+.aviso:empty{display:none}
+.hoja-botones{display:flex;gap:8px;margin-top:14px}
+.hoja-botones .btn{flex:1;padding:12px}
+.menu-lista{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.menu-lista .btn{text-align:left;padding:13px 14px}
+table.hist{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+table.hist td{padding:7px 4px;border-bottom:1px solid var(--borde);vertical-align:top}
+table.hist td.m{text-align:right;font-weight:700;white-space:nowrap}
+
+/* Registro de clientes y formulario */
+.etiqueta{display:block;font-size:13px;color:var(--suave);font-weight:600;margin:12px 0 6px}
+.segmento{display:flex;gap:6px}
+.segmento button{flex:1;border:1px solid var(--borde);background:#fff;border-radius:12px;padding:8px 4px;font-weight:700}
+.segmento button small{display:block;font-weight:500;font-size:11px;color:var(--suave)}
+.segmento button.activa{background:var(--azul);border-color:var(--azul);color:#fff}
+.segmento button.activa small{color:#cfe3ff}
+.sugerencias{display:flex;flex-direction:column;gap:6px;margin-top:-4px}
+.sugerencias button{text-align:left;border:1px solid var(--borde);background:#f7f9fb;border-radius:12px;padding:9px 12px}
+.sugerencias button span{display:block;font-size:13px;color:var(--suave)}
+.sugerencias small{color:var(--suave);font-size:12px}
+.cliente-fijo{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#eef3fa;border:1px solid #cfdcee;border-radius:12px;padding:10px 12px;margin:12px 0}
+.cliente-fijo small{display:block;font-size:12px;color:var(--suave)}
+.cliente-fijo b{display:block;font-size:17px}
+.cliente-fijo span{display:block;font-size:13px;color:var(--suave)}
+.cliente-fijo .btn{padding:8px 12px}
+.mini-lista{display:flex;flex-direction:column;gap:6px}
+.mini{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--borde);background:#fff;border-radius:12px;padding:10px 12px;text-align:left;font-size:14px}
+.sub a{color:var(--azul2)}
+
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login .caja{background:#fff;border:1px solid var(--borde);border-radius:18px;padding:24px 20px;width:100%;max-width:380px;text-align:center}
+.login img{width:72px;height:72px;border-radius:16px}
+.login h1{font-size:22px;margin:10px 0 2px}
+.login form{text-align:left;margin-top:14px}
+.login .btn{width:100%;padding:12px;margin-top:6px}
+.enlace{background:none;border:0;color:var(--azul2);font-weight:600;margin-top:12px;text-decoration:underline}
+
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);background:#1b1f24;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.cargando{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(244,246,248,.6);z-index:30;font-weight:700;color:var(--azul)}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA DE INICIO DE SESIÓN -->
+<section id="pantalla-login" class="login oculto">
+  <div class="caja">
+    <img src="icon-192.png" alt="">
+    <h1>Cartera de Clientes</h1>
+    <div class="t-tel" id="login-sub">Inicia sesión para ver tu cartera</div>
+    <form id="form-login">
+      <label class="campo"><span>Correo</span><input type="email" id="login-correo" autocomplete="username" required></label>
+      <label class="campo"><span>Contraseña</span><input type="password" id="login-clave" autocomplete="current-password" minlength="6" required></label>
+      <div class="aviso rojo" id="login-error"></div>
+      <button class="btn primario" id="login-boton" type="submit">Entrar</button>
+    </form>
+    <button class="enlace" id="login-cambiar" type="button">¿Primera vez? Crear mi cuenta</button>
+  </div>
+</section>
+
+<!-- AVISO DE CONFIGURACIÓN FALTANTE -->
+<section id="pantalla-config" class="login oculto">
+  <div class="caja">
+    <img src="icon-192.png" alt="">
+    <h1>Falta la configuración</h1>
+    <p class="t-tel">Abre el archivo <b>config.js</b> y pega la URL y la clave de tu proyecto de Supabase.</p>
+  </div>
+</section>
+
+<!-- APLICACIÓN -->
+<div id="app" class="oculto">
+  <header>
+    <div class="contenedor">
+      <div class="barra">
+        <img src="icon-192.png" alt="">
+        <h1>Cartera de Clientes</h1>
+        <button class="icono-btn" id="btn-menu" aria-label="Menú">☰ Menú</button>
+      </div>
+      <div class="totales">
+        <div><small>Prestado (toda la cartera)</small><b id="tot-prestado">$0</b></div>
+        <div><small>Por cobrar</small><b id="tot-cobrar">$0</b></div>
+      </div>
+    </div>
+  </header>
+  <main class="contenedor">
+    <nav class="pestanas" id="pestanas"></nav>
+    <div class="resumen" id="resumen"></div>
+    <div class="acciones">
+      <input type="search" id="buscar" placeholder="Buscar cliente o teléfono">
+      <button class="btn primario" id="btn-nuevo">+ Nuevo</button>
+    </div>
+    <div class="leyenda" id="leyenda">Rojo = vencido · Amarillo = vence hoy o mañana · Toca el nombre para ver el historial</div>
+    <div class="lista" id="lista"></div>
+  </main>
+</div>
+
+<div id="modal-raiz"></div>
+<input type="file" id="archivo-importar" accept=".json,.db,application/json" class="oculto">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+"use strict";
+// ---------------------------------------------------------------------
+// CONFIGURACIÓN DE SECCIONES (igual que la app de escritorio)
+// ---------------------------------------------------------------------
+const SECCIONES = [
+  { tasa: 20, titulo: "20%", sub: "1 semana",       dias: 7  },
+  { tasa: 30, titulo: "30%", sub: "2 a 3 semanas",  dias: 21 },
+  { tasa: 40, titulo: "40%", sub: "3 a 4 semanas",  dias: 28 },
+];
+
+let sb = null, usuario = null, prestamos = [], clientes = [], pestana = 20, filtro = "";
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------
+// UTILIDADES
+// ---------------------------------------------------------------------
+function pesos(v){ return "$" + Math.round(Number(v)||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+function leerMonto(t){ const s = String(t||"").replace(/[^\d]/g, ""); return s ? parseInt(s, 10) : NaN; }
+function formatearCampoMonto(input){
+  input.addEventListener("input", () => {
+    const n = leerMonto(input.value);
+    input.value = isNaN(n) ? "" : n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  });
+}
+function isoLocal(d){ const z = new Date(d.getTime() - d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+function hoyISO(){ return isoLocal(new Date()); }
+function sumarDias(iso, dias){ const [a,m,d] = iso.split("-").map(Number); return isoLocal(new Date(a, m-1, d + Number(dias))); }
+function diasEntre(desdeISO, hastaISO){
+  const [a1,m1,d1] = desdeISO.split("-").map(Number), [a2,m2,d2] = hastaISO.split("-").map(Number);
+  return Math.round((Date.UTC(a2,m2-1,d2) - Date.UTC(a1,m1-1,d1)) / 86400000);
+}
+function fechaTxt(iso){ if(!iso) return "-"; const [a,m,d] = String(iso).slice(0,10).split("-"); return `${d}/${m}/${a}`; }
+function esc(t){ return String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function seccionDe(tasa){ return SECCIONES.find(s => s.tasa === Number(tasa)) || { tasa, titulo: tasa+"%", sub:"", dias: 7 }; }
+
+function toast(msg, ms = 2600){
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms);
+}
+let cargas = 0;
+function cargando(on){
+  cargas += on ? 1 : -1;
+  let el = document.querySelector(".cargando");
+  if (cargas > 0 && !el){ el = document.createElement("div"); el.className = "cargando"; el.textContent = "Guardando…"; document.body.appendChild(el); }
+  if (cargas <= 0){ cargas = 0; el && el.remove(); }
+}
+async function ok(promesa){
+  const { data, error } = await promesa;
+  if (error) throw error;
+  return data;
+}
+function mostrarError(e){
+  console.error(e);
+  let m = (e && (e.message || e.error_description)) || String(e);
+  if (/Failed to fetch|NetworkError/i.test(m)) m = "Sin conexión a internet. Intenta de nuevo.";
+  alert("Ocurrió un problema:\n" + m);
+}
+
+// ---------------------------------------------------------------------
+// VENTANAS (hojas que suben desde abajo)
+// ---------------------------------------------------------------------
+function abrirHoja(html, alMontar){
+  const raiz = $("modal-raiz");
+  raiz.innerHTML = `<div class="fondo-modal"><div class="hoja" role="dialog" aria-modal="true">${html}</div></div>`;
+  const fondo = raiz.firstElementChild;
+  fondo.addEventListener("click", e => { if (e.target === fondo) cerrarHoja(); });
+  fondo.querySelectorAll("[data-cerrar]").forEach(b => b.addEventListener("click", cerrarHoja));
+  alMontar && alMontar(fondo.querySelector(".hoja"));
+}
+function cerrarHoja(){ $("modal-raiz").innerHTML = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarHoja(); });
+
+// ---------------------------------------------------------------------
+// DATOS (Supabase)
+// ---------------------------------------------------------------------
+async function cargarDatos(){
+  clientes  = await ok(sb.from("clientes").select("*").order("nombre", { ascending: true }));
+  prestamos = await ok(sb.from("prestamos").select("*").order("fecha_pago", { ascending: true }));
+  if (await asegurarClientes()) prestamos = await ok(sb.from("prestamos").select("*").order("fecha_pago", { ascending: true }));
+  clientes.sort((a,b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
+  pintar();
+}
+
+// --- Registro de clientes -------------------------------------------
+const normal = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const soloDigitos = t => String(t || "").replace(/\D/g, "");
+// Busca un cliente ya registrado con el mismo nombre (y mismo teléfono si ambos lo tienen)
+function clienteParecido(nombre, telefono){
+  const n = normal(nombre), t = soloDigitos(telefono);
+  return clientes.find(c => normal(c.nombre) === n && (!t || !soloDigitos(c.telefono) || soloDigitos(c.telefono) === t));
+}
+async function obtenerOCrearCliente(nombre, telefono, direccion = "", notas = ""){
+  const ya = clienteParecido(nombre, telefono);
+  if (ya){
+    if (telefono && !ya.telefono){ await ok(sb.from("clientes").update({ telefono }).eq("id", ya.id)); ya.telefono = telefono; }
+    return ya;
+  }
+  const nuevo = await ok(sb.from("clientes").insert({ nombre: nombre.trim(), telefono: telefono || "", direccion, notas }).select().single());
+  clientes.push(nuevo);
+  return nuevo;
+}
+// Préstamos viejos que no tienen cliente: se les crea o asigna uno automáticamente
+async function asegurarClientes(){
+  const sueltos = prestamos.filter(p => !p.cliente_id);
+  for (const p of sueltos){
+    const c = await obtenerOCrearCliente(p.nombre, p.telefono);
+    await ok(sb.from("prestamos").update({ cliente_id: c.id }).eq("id", p.id));
+  }
+  return sueltos.length > 0;
+}
+const prestamosDe = id => prestamos.filter(p => p.cliente_id === id);
+const clientePorId = id => clientes.find(c => c.id === id);
+async function registrar(prestamo_id, tipo, monto, detalle, fecha){
+  await ok(sb.from("movimientos").insert({ prestamo_id, tipo, monto, detalle, fecha: fecha || hoyISO() }));
+}
+async function crearPrestamo(d){
+  const deuda = Math.round(d.capital * (1 + d.tasa/100));
+  const nuevo = await ok(sb.from("prestamos").insert({
+    cliente_id: d.cliente_id, nombre: d.nombre, telefono: d.telefono, capital: d.capital, tasa: d.tasa, deuda,
+    fecha_prestamo: d.fecha_prestamo, fecha_pago: d.fecha_pago, notas: d.notas, estado: "activo"
+  }).select().single());
+  await ok(sb.from("movimientos").insert([
+    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Préstamo", monto: d.capital, detalle: `Se prestaron ${pesos(d.capital)} al ${d.tasa}%` },
+    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Interés",  monto: deuda - d.capital, detalle: `Interés del ${d.tasa}%` },
+  ]));
+}
+async function accion(fn, mensaje){
+  cargando(true);
+  try { await fn(); await cargarDatos(); mensaje && toast(mensaje); return true; }
+  catch(e){ mostrarError(e); return false; }
+  finally { cargando(false); }
+}
+
+// ---------------------------------------------------------------------
+// PINTAR PANTALLA
+// ---------------------------------------------------------------------
+function pintar(){
+  const activos = prestamos.filter(p => p.estado === "activo");
+  $("tot-prestado").textContent = pesos(activos.reduce((s,p) => s + Number(p.capital), 0));
+  $("tot-cobrar").textContent   = pesos(activos.reduce((s,p) => s + Number(p.deuda), 0));
+
+  // pestañas
+  $("pestanas").innerHTML = SECCIONES.map(s => {
+    const n = activos.filter(p => p.tasa === s.tasa).length;
+    return `<button data-tab="${s.tasa}" class="${pestana===s.tasa?"activa":""}">${s.titulo} <small>· ${s.sub}</small> (${n})</button>`;
+  }).join("") + `<button data-tab="pagados" class="${pestana==="pagados"?"activa":""}">Pagados</button>`
+             + `<button data-tab="clientes" class="${pestana==="clientes"?"activa":""}">👤 Clientes (${clientes.length})</button>`;
+  $("pestanas").querySelectorAll("button").forEach(b => b.onclick = () => {
+    const t = b.dataset.tab;
+    pestana = (t === "pagados" || t === "clientes") ? t : Number(t); pintar(); window.scrollTo({top:0});
+  });
+  const activa = $("pestanas").querySelector(".activa"); activa && activa.scrollIntoView({ inline: "nearest", block: "nearest" });
+
+  const f = normal(filtro);
+  const coincide = p => !f || normal(p.nombre).includes(f) || (p.telefono||"").includes(filtro.trim());
+  const hoy = hoyISO();
+  $("btn-nuevo").textContent = pestana === "clientes" ? "+ Cliente" : "+ Nuevo";
+
+  if (pestana === "clientes"){
+    const conActivo = clientes.filter(c => prestamosDe(c.id).some(p => p.estado === "activo")).length;
+    $("resumen").innerHTML = `<div><small>Clientes registrados</small><b>${clientes.length}</b></div>
+      <div><small>Con préstamo activo</small><b>${conActivo}</b></div>
+      <div><small>Sin préstamo activo</small><b>${clientes.length - conActivo}</b></div>
+      <div><small>Han repetido</small><b>${clientes.filter(c => prestamosDe(c.id).length > 1).length}</b></div>`;
+    $("btn-nuevo").classList.remove("oculto");
+    $("leyenda").textContent = "Todos tus clientes quedan guardados aquí aunque ya hayan pagado · Toca el nombre para ver su ficha";
+    const vis = clientes.filter(c => !f || normal(c.nombre).includes(f) || (c.telefono||"").includes(filtro.trim()) || normal(c.direccion).includes(f));
+    $("lista").innerHTML = vis.length ? vis.map(c => {
+      const ps = prestamosDe(c.id), act = ps.filter(p => p.estado === "activo");
+      const ultimo = ps.map(p => p.fecha_prestamo).sort().pop();
+      const tel = (c.telefono||"").replace(/[^\d+]/g, "");
+      const wa = tel ? (tel.startsWith("+") ? tel.slice(1) : (tel.length === 10 ? "57" + tel : tel)) : "";
+      const chip = act.length ? `<span class="chip pronto">${act.length} activo${act.length>1?"s":""} · debe ${pesos(act.reduce((s,p)=>s+Number(p.deuda),0))}</span>`
+                              : `<span class="chip pagado">Al día</span>`;
+      return `<article class="tarjeta ${act.length ? "pronto" : "pagado"}">
+        <div class="t-arriba"><button class="t-nombre" data-cliente="${c.id}">${esc(c.nombre)}</button>${chip}</div>
+        <div class="t-tel">${tel ? `<a href="tel:${esc(tel)}">${esc(c.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : "Sin teléfono"}${c.direccion ? " · " + esc(c.direccion) : ""}</div>
+        <div class="t-datos"><div><small>Préstamos</small><b>${ps.length}</b></div>
+          <div><small>Total prestado</small><b>${pesos(ps.reduce((s,p)=>s+Number(p.capital),0))}</b></div>
+          <div><small>Último préstamo</small><b>${fechaTxt(ultimo)}</b></div></div>
+        <div class="t-botones"><button class="btn primario" data-prestar="${c.id}">+ Préstamo</button>
+          <button class="btn" data-cliente="${c.id}">Ver ficha</button></div>
+      </article>`;
+    }).join("") : `<div class="vacio">${f ? "No hay resultados." : "Todavía no hay clientes registrados.<br>Se agregan solos al crear un préstamo, o con <b>+ Cliente</b>."}</div>`;
+  } else if (pestana === "pagados"){
+    const pag = prestamos.filter(p => p.estado === "pagado")
+      .sort((a,b) => String(b.fecha_pagado).localeCompare(String(a.fecha_pagado)));
+    const gan = pag.reduce((s,p) => s + (p.deuda - p.capital), 0);
+    $("resumen").innerHTML = `<div><small>Préstamos pagados</small><b>${pag.length}</b></div>
+      <div><small>Total cobrado</small><b>${pesos(pag.reduce((s,p)=>s+Number(p.deuda),0))}</b></div>
+      <div><small>Ganancia cobrada</small><b>${pesos(gan)}</b></div>
+      <div><small>Ganancia este mes</small><b>${pesos(pag.filter(p => String(p.fecha_pagado).slice(0,7) === hoyISO().slice(0,7)).reduce((s,p) => s + (p.deuda - p.capital), 0))}</b></div>`;
+    $("btn-nuevo").classList.add("oculto");
+    $("leyenda").textContent = "Toca un préstamo para ver su historial o deshacer el pago";
+    const vis = pag.filter(coincide);
+    $("lista").innerHTML = vis.length ? vis.map(p => `
+      <article class="tarjeta pagado">
+        <div class="t-arriba"><button class="t-nombre" data-ver="${p.id}">${esc(p.nombre)}</button><span class="chip pagado">Pagó ${fechaTxt(p.fecha_pagado)}</span></div>
+        <div class="t-tel">Sección ${p.tasa}%${p.telefono ? " · " + esc(p.telefono) : ""}</div>
+        <div class="t-datos"><div><small>Prestado</small><b>${pesos(p.capital)}</b></div>
+          <div><small>Pagó</small><b>${pesos(p.deuda)}</b></div><div><small>Ganancia</small><b>${pesos(p.deuda-p.capital)}</b></div></div>
+      </article>`).join("") : `<div class="vacio">${f ? "No hay resultados." : "Todavía no hay préstamos pagados."}</div>`;
+  } else {
+    const sec = seccionDe(pestana);
+    const lista = activos.filter(p => p.tasa === pestana);
+    const prest = lista.reduce((s,p) => s + Number(p.capital), 0), cobr = lista.reduce((s,p) => s + Number(p.deuda), 0);
+    $("resumen").innerHTML = `<div><small>Clientes activos</small><b>${lista.length}</b></div>
+      <div><small>Total prestado</small><b>${pesos(prest)}</b></div>
+      <div><small>Por cobrar</small><b>${pesos(cobr)}</b></div>
+      <div><small>Ganancia esperada</small><b>${pesos(cobr-prest)}</b></div>`;
+    $("btn-nuevo").classList.remove("oculto");
+    $("leyenda").textContent = "Rojo = vencido · Amarillo = vence hoy o mañana · Toca el nombre para ver el historial";
+    const vis = lista.filter(coincide);
+    $("lista").innerHTML = vis.length ? vis.map(p => {
+      const dias = diasEntre(hoy, p.fecha_pago);
+      let clase = "", chip = `Faltan ${dias} días`;
+      if (dias < 0){ clase = "vencido"; chip = `VENCIDO hace ${-dias} día${-dias===1?"":"s"}`; }
+      else if (dias === 0){ clase = "pronto"; chip = "Vence HOY"; }
+      else if (dias === 1){ clase = "pronto"; chip = "Vence mañana"; }
+      const tel = (p.telefono||"").replace(/[^\d+]/g, "");
+      const wa = tel ? (tel.startsWith("+") ? tel.slice(1) : (tel.length === 10 ? "57" + tel : tel)) : "";
+      return `<article class="tarjeta ${clase}">
+        <div class="t-arriba"><button class="t-nombre" data-ver="${p.id}">${esc(p.nombre)}</button><span class="chip ${clase}">${chip}</span></div>
+        ${tel ? `<div class="t-tel"><a href="tel:${esc(tel)}">${esc(p.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a></div>` : ""}
+        <div class="t-datos"><div><small>Prestado</small><b>${pesos(p.capital)}</b></div>
+          <div class="debe"><small>Debe pagar</small><b>${pesos(p.deuda)}</b></div>
+          <div><small>Fecha de pago</small><b>${fechaTxt(p.fecha_pago)}</b></div></div>
+        <div class="t-botones"><button class="btn verde" data-pagar="${p.id}">✔ Ya pagó</button>
+          <button class="btn suave-rojo" data-subir="${p.id}">▲ Subir deuda</button></div>
+      </article>`;
+    }).join("") : `<div class="vacio">${f ? "No hay resultados." : `No hay clientes en la sección ${sec.titulo}.<br>Toca <b>+ Nuevo</b> para agregar uno.`}</div>`;
+  }
+  $("lista").querySelectorAll("[data-ver]").forEach(b => b.onclick = () => verDetalle(Number(b.dataset.ver)));
+  $("lista").querySelectorAll("[data-pagar]").forEach(b => b.onclick = () => marcarPagado(Number(b.dataset.pagar)));
+  $("lista").querySelectorAll("[data-subir]").forEach(b => b.onclick = () => subirDeuda(Number(b.dataset.subir)));
+  $("lista").querySelectorAll("[data-cliente]").forEach(b => b.onclick = () => verCliente(Number(b.dataset.cliente)));
+  $("lista").querySelectorAll("[data-prestar]").forEach(b => b.onclick = () => nuevoPrestamo(Number(b.dataset.prestar)));
+}
+const buscarP = id => prestamos.find(p => p.id === id);
+
+// ---------------------------------------------------------------------
+// ACCIONES
+// ---------------------------------------------------------------------
+function nuevoPrestamo(clienteId){
+  let tasa = typeof pestana === "number" ? pestana : 20;
+  let elegido = clienteId ? clientePorId(clienteId) : null;
+  abrirHoja(`
+    <h2>Nuevo préstamo</h2>
+    <form id="f" autocomplete="off">
+      <span class="etiqueta">Sección</span>
+      <div class="segmento" id="f-secciones">${SECCIONES.map(s => `<button type="button" data-tasa="${s.tasa}">${s.titulo}<small>${s.sub}</small></button>`).join("")}</div>
+      <div id="f-cliente"></div>
+      <label class="campo"><span>¿Cuánto se le presta? *</span><input id="f-capital" inputmode="numeric" placeholder="Ej: 500.000" required></label>
+      <label class="campo"><span>Fecha del préstamo</span><input id="f-fecha" type="date" value="${hoyISO()}" required></label>
+      <label class="campo"><span>Plazo en días</span><input id="f-dias" type="number" inputmode="numeric" min="1" required></label>
+      <label class="campo"><span>Notas de este préstamo</span><input id="f-notas"></label>
+      <div class="aviso" id="f-aviso"></div>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
+    </form>`, hoja => {
+      const q = sel => hoja.querySelector(sel);
+      const cap = q("#f-capital"); formatearCampoMonto(cap);
+      const calc = () => {
+        const c = leerMonto(cap.value), fe = q("#f-fecha").value, d = parseInt(q("#f-dias").value, 10);
+        q("#f-aviso").textContent = (c > 0 && fe && d > 0)
+          ? `Debe pagar ${pesos(Math.round(c*(1+tasa/100)))} el ${fechaTxt(sumarDias(fe, d))}` : "";
+      };
+      const ponerSeccion = t => {
+        tasa = t; q("#f-dias").value = seccionDe(t).dias;
+        hoja.querySelectorAll("#f-secciones button").forEach(b => b.classList.toggle("activa", Number(b.dataset.tasa) === t));
+        calc();
+      };
+      hoja.querySelectorAll("#f-secciones button").forEach(b => b.onclick = () => ponerSeccion(Number(b.dataset.tasa)));
+
+      // --- Cliente: uno ya registrado o uno nuevo ---
+      const pintarCliente = () => {
+        const caja = q("#f-cliente");
+        if (elegido){
+          const act = prestamosDe(elegido.id).filter(p => p.estado === "activo");
+          caja.innerHTML = `<div class="cliente-fijo"><div><small>Cliente registrado</small><b>${esc(elegido.nombre)}</b>
+              <span>${esc(elegido.telefono || "Sin teléfono")}${elegido.direccion ? " · " + esc(elegido.direccion) : ""} · ${prestamosDe(elegido.id).length} préstamo(s) antes</span></div>
+              <button type="button" class="btn" id="f-cambiar">Cambiar</button></div>
+            ${act.length ? `<div class="aviso rojo">Ojo: ya tiene ${act.length} préstamo(s) activo(s) por ${pesos(act.reduce((s,p)=>s+Number(p.deuda),0))}</div>` : ""}`;
+          q("#f-cambiar").onclick = () => { elegido = null; pintarCliente(); q("#f-nombre").focus(); };
+        } else {
+          caja.innerHTML = `
+            <label class="campo"><span>Cliente * (escribe para buscar o crear uno nuevo)</span><input id="f-nombre" required placeholder="Nombre del cliente"></label>
+            <div class="sugerencias" id="f-sug"></div>
+            <div id="f-nuevo-datos">
+              <label class="campo"><span>Teléfono</span><input id="f-tel" type="tel" inputmode="tel"></label>
+              <label class="campo"><span>Dirección / barrio</span><input id="f-dir"></label>
+            </div>`;
+          const nom = q("#f-nombre");
+          nom.addEventListener("input", () => {
+            const t = normal(nom.value);
+            const m = t ? clientes.filter(c => normal(c.nombre).includes(t) || (c.telefono||"").includes(nom.value.trim())).slice(0, 5) : [];
+            q("#f-sug").innerHTML = m.map(c => `<button type="button" data-elegir="${c.id}"><b>${esc(c.nombre)}</b><span>${esc(c.telefono || "Sin teléfono")} · ${prestamosDe(c.id).length} préstamo(s)</span></button>`).join("")
+              + (m.length ? `<small>Toca un cliente para usar sus datos, o sigue escribiendo para crear uno nuevo.</small>` : "");
+            q("#f-sug").querySelectorAll("[data-elegir]").forEach(b => b.onclick = () => { elegido = clientePorId(Number(b.dataset.elegir)); pintarCliente(); cap.focus(); });
+          });
+        }
+      };
+      pintarCliente();
+      ponerSeccion(tasa);
+      hoja.querySelectorAll("#f-capital,#f-fecha,#f-dias").forEach(i => i.addEventListener("input", calc));
+      (elegido ? cap : q("#f-nombre")).focus();
+
+      q("#f").onsubmit = async e => {
+        e.preventDefault();
+        const capital = leerMonto(cap.value), fecha = q("#f-fecha").value, dias = parseInt(q("#f-dias").value, 10);
+        if (!elegido && !q("#f-nombre").value.trim()) return alert("Escribe el nombre del cliente.");
+        if (!(capital > 0)) return alert("Escribe cuánto se le presta.");
+        if (!fecha || !(dias > 0)) return alert("Revisa la fecha y el plazo.");
+        if (!elegido){
+          const parecido = clienteParecido(q("#f-nombre").value, q("#f-tel").value);
+          if (parecido && confirm(`Ya tienes registrado a "${parecido.nombre}" (${parecido.telefono || "sin teléfono"}).\n¿Es el mismo cliente?\n\nAceptar = usar ese cliente · Cancelar = crear uno nuevo`)) elegido = parecido;
+        }
+        const listo = await accion(async () => {
+          let c = elegido;
+          if (!c){
+            c = await ok(sb.from("clientes").insert({ nombre: q("#f-nombre").value.trim(), telefono: q("#f-tel").value.trim(), direccion: q("#f-dir").value.trim(), notas: "" }).select().single());
+          }
+          await crearPrestamo({ cliente_id: c.id, nombre: c.nombre, telefono: c.telefono || "", capital, tasa,
+            fecha_prestamo: fecha, fecha_pago: sumarDias(fecha, dias), notas: q("#f-notas").value.trim() });
+        }, "Préstamo guardado");
+        if (listo){ cerrarHoja(); if (pestana !== "clientes") pestana = tasa; pintar(); }
+      };
+  });
+}
+
+// --- Ficha del cliente ------------------------------------------------
+function verCliente(id){
+  const c = clientePorId(id); if (!c) return;
+  const ps = prestamosDe(id).slice().sort((a,b) => String(b.fecha_prestamo).localeCompare(String(a.fecha_prestamo)) || b.id - a.id);
+  const act = ps.filter(p => p.estado === "activo"), pag = ps.filter(p => p.estado === "pagado");
+  const tel = (c.telefono||"").replace(/[^\d+]/g, "");
+  const wa = tel ? (tel.startsWith("+") ? tel.slice(1) : (tel.length === 10 ? "57" + tel : tel)) : "";
+  abrirHoja(`
+    <h2>${esc(c.nombre)}</h2>
+    <p class="sub">${tel ? `<a href="tel:${esc(tel)}">${esc(c.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : "Sin teléfono"}
+      ${c.direccion ? `<br>📍 ${esc(c.direccion)}` : ""}${c.notas ? `<br>📝 ${esc(c.notas)}` : ""}</p>
+    <div class="resumen" style="margin-top:0">
+      <div><small>Préstamos</small><b>${ps.length}</b></div>
+      <div><small>Activos</small><b>${act.length}</b></div>
+      <div><small>Total prestado</small><b>${pesos(ps.reduce((s,p)=>s+Number(p.capital),0))}</b></div>
+      <div><small>Ganancia cobrada</small><b>${pesos(pag.reduce((s,p)=>s+(p.deuda-p.capital),0))}</b></div>
+    </div>
+    <span class="etiqueta">Historial de préstamos</span>
+    <div class="mini-lista">${ps.length ? ps.map(p => `
+      <button type="button" class="mini" data-ver-p="${p.id}">
+        <span><b>${pesos(p.capital)}</b> al ${p.tasa}% · ${fechaTxt(p.fecha_prestamo)}</span>
+        <span class="chip ${p.estado === "pagado" ? "pagado" : (diasEntre(hoyISO(), p.fecha_pago) < 0 ? "vencido" : "pronto")}">${p.estado === "pagado" ? "Pagó " + pesos(p.deuda) : "Debe " + pesos(p.deuda)}</span>
+      </button>`).join("") : `<div class="t-tel">Todavía no tiene préstamos.</div>`}</div>
+    <div class="menu-lista">
+      <button class="btn primario" id="c-prestar">+ Nuevo préstamo a ${esc(c.nombre.split(" ")[0])}</button>
+      <button class="btn" id="c-editar">✏ Editar datos del cliente</button>
+      <button class="btn suave-rojo" id="c-borrar">🗑 Eliminar cliente</button>
+      <button class="btn" data-cerrar>Cerrar</button>
+    </div>`, hoja => {
+      hoja.querySelector("#c-prestar").onclick = () => nuevoPrestamo(id);
+      hoja.querySelector("#c-editar").onclick = () => editarCliente(id);
+      hoja.querySelectorAll("[data-ver-p]").forEach(b => b.onclick = () => verDetalle(Number(b.dataset.verP)));
+      hoja.querySelector("#c-borrar").onclick = async () => {
+        if (ps.length) return alert(`No se puede eliminar porque tiene ${ps.length} préstamo(s) en su historial.\nSi de verdad quieres borrarlo, primero elimina sus préstamos.`);
+        if (!confirm(`¿Eliminar a ${c.nombre} del registro de clientes?`)) return;
+        if (await accion(() => ok(sb.from("clientes").delete().eq("id", id)), "Cliente eliminado")) cerrarHoja();
+      };
+  });
+}
+
+function editarCliente(id){
+  const c = id ? clientePorId(id) : { nombre: "", telefono: "", direccion: "", notas: "" };
+  abrirHoja(`
+    <h2>${id ? "Editar cliente" : "Nuevo cliente"}</h2>
+    <form id="f" autocomplete="off">
+      <label class="campo"><span>Nombre *</span><input id="e-nombre" value="${esc(c.nombre)}" required></label>
+      <label class="campo"><span>Teléfono</span><input id="e-tel" type="tel" inputmode="tel" value="${esc(c.telefono||"")}"></label>
+      <label class="campo"><span>Dirección / barrio</span><input id="e-dir" value="${esc(c.direccion||"")}"></label>
+      <label class="campo"><span>Notas</span><textarea id="e-notas" rows="3">${esc(c.notas||"")}</textarea></label>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
+    </form>`, hoja => {
+      hoja.querySelector("#e-nombre").focus();
+      hoja.querySelector("#f").onsubmit = async e => {
+        e.preventDefault();
+        const datos = { nombre: hoja.querySelector("#e-nombre").value.trim(), telefono: hoja.querySelector("#e-tel").value.trim(),
+                        direccion: hoja.querySelector("#e-dir").value.trim(), notas: hoja.querySelector("#e-notas").value.trim() };
+        if (!datos.nombre) return alert("Escribe el nombre.");
+        if (!id){
+          const parecido = clienteParecido(datos.nombre, datos.telefono);
+          if (parecido && !confirm(`Ya existe "${parecido.nombre}" (${parecido.telefono || "sin teléfono"}). ¿Crear otro cliente de todas formas?`)) return;
+        }
+        let nuevoId = id;
+        const listo = await accion(async () => {
+          if (id){
+            await ok(sb.from("clientes").update(datos).eq("id", id));
+            // el nombre y teléfono también se actualizan en sus préstamos
+            for (const p of prestamosDe(id)) await ok(sb.from("prestamos").update({ nombre: datos.nombre, telefono: datos.telefono }).eq("id", p.id));
+          } else {
+            nuevoId = (await ok(sb.from("clientes").insert(datos).select().single())).id;
+          }
+        }, id ? "Cliente actualizado" : "Cliente registrado");
+        if (listo) verCliente(nuevoId);
+      };
+  });
+}
+
+async function marcarPagado(id){
+  const p = buscarP(id); if (!p) return;
+  if (!confirm(`¿Confirmas que ${p.nombre} pagó ${pesos(p.deuda)}?\n\nPasará a la pestaña "Pagados".`)) return;
+  await accion(async () => {
+    await ok(sb.from("prestamos").update({ estado: "pagado", fecha_pagado: hoyISO() }).eq("id", id));
+    await registrar(id, "Pago", p.deuda, "Pagó la deuda completa");
+  }, `${p.nombre} quedó como pagado`);
+}
+
+function subirDeuda(id){
+  const p = buscarP(id); if (!p) return;
+  const sec = seccionDe(p.tasa);
+  const recargo = Math.round(p.capital * p.tasa / 100);
+  const base = p.fecha_pago > hoyISO() ? p.fecha_pago : hoyISO();
+  abrirHoja(`
+    <h2>Subir deuda a ${esc(p.nombre)}</h2>
+    <p class="sub">Prestado: <b>${pesos(p.capital)}</b> · Debe hoy: <b>${pesos(p.deuda)}</b><br>
+      Sugerido: otro ${p.tasa}% sobre lo prestado = ${pesos(recargo)} (puedes cambiarlo)</p>
+    <form id="f">
+      <label class="campo"><span>¿Cuánto se le sube?</span><input id="s-monto" inputmode="numeric" value="${pesos(recargo).slice(1)}" required></label>
+      <label class="campo"><span>Nueva fecha de pago</span><input id="s-fecha" type="date" value="${sumarDias(base, sec.dias)}" required></label>
+      <div class="aviso rojo" id="s-aviso"></div>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn rojo" type="submit">Subir deuda</button></div>
+    </form>`, hoja => {
+      const m = hoja.querySelector("#s-monto"); formatearCampoMonto(m);
+      const calc = () => { const r = leerMonto(m.value); hoja.querySelector("#s-aviso").textContent = r >= 0 ? `Nueva deuda: ${pesos(Number(p.deuda) + r)}` : ""; };
+      m.addEventListener("input", calc); calc();
+      hoja.querySelector("#f").onsubmit = async e => {
+        e.preventDefault();
+        const r = leerMonto(m.value), nf = hoja.querySelector("#s-fecha").value;
+        if (!(r >= 0) || !nf) return alert("Revisa el monto y la fecha.");
+        const listo = await accion(async () => {
+          await ok(sb.from("prestamos").update({ deuda: Number(p.deuda) + r, fecha_pago: nf }).eq("id", id));
+          await registrar(id, "Recargo", r, `No pagó a tiempo. Nueva fecha: ${fechaTxt(nf)}`);
+        }, "Deuda actualizada");
+        if (listo) cerrarHoja();
+      };
+  });
+}
+
+async function verDetalle(id){
+  const p = buscarP(id); if (!p) return;
+  let movs = [];
+  cargando(true);
+  try { movs = await ok(sb.from("movimientos").select("*").eq("prestamo_id", id).order("id", { ascending: true })); }
+  catch(e){ mostrarError(e); return; } finally { cargando(false); }
+  const pagado = p.estado === "pagado";
+  abrirHoja(`
+    <h2>${esc(p.nombre)}</h2>
+    <p class="sub">Sección ${p.tasa}% · Tel: ${esc(p.telefono || "-")}<br>
+      Prestado: <b>${pesos(p.capital)}</b> · Deuda total: <b>${pesos(p.deuda)}</b> · ${pagado ? "PAGADO" : "Activo · paga el " + fechaTxt(p.fecha_pago)}
+      ${p.notas ? `<br>Notas: ${esc(p.notas)}` : ""}</p>
+    <table class="hist">${movs.map(m => `<tr><td>${fechaTxt(m.fecha)}<br><small>${esc(m.tipo)}</small></td><td>${esc(m.detalle)}</td><td class="m">${pesos(m.monto)}</td></tr>`).join("") || "<tr><td>Sin movimientos</td></tr>"}</table>
+    <div class="menu-lista">
+      ${p.cliente_id ? `<button class="btn" id="d-cliente">👤 Ver ficha del cliente</button>` : ""}
+      ${pagado ? `<button class="btn" id="d-reactivar">↩ Deshacer pago (volver a activo)</button>` : ""}
+      <button class="btn" id="d-editar">✏ Editar notas del préstamo</button>
+      <button class="btn suave-rojo" id="d-borrar">🗑 Eliminar préstamo</button>
+      <button class="btn" data-cerrar>Cerrar</button>
+    </div>`, hoja => {
+      hoja.querySelector("#d-editar").onclick = () => editar(id);
+      const vc = hoja.querySelector("#d-cliente"); if (vc) vc.onclick = () => verCliente(p.cliente_id);
+      const r = hoja.querySelector("#d-reactivar"); if (r) r.onclick = async () => {
+        if (!confirm("¿Volver a poner este préstamo como NO pagado?")) return;
+        const listo = await accion(async () => {
+          await ok(sb.from("prestamos").update({ estado: "activo", fecha_pagado: null }).eq("id", id));
+          await registrar(id, "Corrección", 0, "Se deshizo el pago (vuelve a estar activo)");
+        }, "Préstamo activo de nuevo");
+        if (listo) cerrarHoja();
+      };
+      hoja.querySelector("#d-borrar").onclick = async () => {
+        if (!confirm(`¿Seguro que quieres ELIMINAR el préstamo de ${p.nombre}?\nSe borra también su historial y no se puede deshacer.`)) return;
+        const listo = await accion(async () => {
+          await ok(sb.from("movimientos").delete().eq("prestamo_id", id));
+          await ok(sb.from("prestamos").delete().eq("id", id));
+        }, "Préstamo eliminado");
+        if (listo) cerrarHoja();
+      };
+  });
+}
+
+function editar(id){
+  const p = buscarP(id); if (!p) return;
+  abrirHoja(`
+    <h2>Notas del préstamo</h2><p class="sub">${esc(p.nombre)} · ${pesos(p.capital)} al ${p.tasa}%<br>Para cambiar nombre, teléfono o dirección usa la ficha del cliente.</p>
+    <form id="f">
+      <label class="campo"><span>Notas</span><textarea id="e-notas" rows="3">${esc(p.notas||"")}</textarea></label>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
+    </form>`, hoja => {
+      hoja.querySelector("#f").onsubmit = async e => {
+        e.preventDefault();
+        const listo = await accion(() => ok(sb.from("prestamos").update({ notas: hoja.querySelector("#e-notas").value.trim() }).eq("id", id)), "Notas guardadas");
+        if (listo) cerrarHoja();
+      };
+  });
+}
+
+// ---------------------------------------------------------------------
+// MENÚ: copia de seguridad, importar, cerrar sesión
+// ---------------------------------------------------------------------
+function abrirMenu(){
+  abrirHoja(`
+    <h2>Menú</h2><p class="sub">Sesión: ${esc(usuario?.email || "")}</p>
+    <div class="menu-lista">
+      <button class="btn" id="m-copia">💾 Descargar copia de seguridad</button>
+      <button class="btn" id="m-importar">📥 Importar copia (de esta web o de la app de escritorio)</button>
+      <button class="btn" id="m-recargar">🔄 Actualizar datos</button>
+      <button class="btn suave-rojo" id="m-salir">Cerrar sesión</button>
+      <button class="btn" data-cerrar>Cerrar</button>
+    </div>`, hoja => {
+      hoja.querySelector("#m-copia").onclick = descargarCopia;
+      hoja.querySelector("#m-importar").onclick = () => { cerrarHoja(); $("archivo-importar").click(); };
+      hoja.querySelector("#m-recargar").onclick = async () => { cerrarHoja(); await accion(async () => {}, "Datos actualizados"); };
+      hoja.querySelector("#m-salir").onclick = async () => { cerrarHoja(); await sb.auth.signOut(); };
+  });
+}
+
+async function descargarCopia(){
+  cargando(true);
+  try {
+    const p = await ok(sb.from("prestamos").select("*").order("id", { ascending: true }));
+    const m = await ok(sb.from("movimientos").select("*").order("id", { ascending: true }));
+    const c = await ok(sb.from("clientes").select("*").order("id", { ascending: true }));
+    const blob = new Blob([JSON.stringify({ app: "cartera", version: 2, fecha: hoyISO(), clientes: c, prestamos: p, movimientos: m }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `copia_cartera_${fechaTxt(hoyISO()).replace(/\//g, "-")}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast("Copia descargada");
+  } catch(e){ mostrarError(e); } finally { cargando(false); }
+}
+
+function cargarScript(src){
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("No se pudo cargar " + src)); document.head.appendChild(s); });
+}
+async function leerDbEscritorio(archivo){
+  const BASE = "https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/";
+  if (!window.initSqlJs) await cargarScript(BASE + "sql-wasm.js");
+  const SQL = await window.initSqlJs({ locateFile: f => BASE + f });
+  const db = new SQL.Database(new Uint8Array(await archivo.arrayBuffer()));
+  const filas = (sql) => { const r = db.exec(sql); if (!r.length) return []; const { columns, values } = r[0]; return values.map(v => Object.fromEntries(columns.map((c,i) => [c, v[i]]))); };
+  const out = { prestamos: filas("SELECT * FROM prestamos ORDER BY id"), movimientos: filas("SELECT * FROM movimientos ORDER BY id") };
+  db.close();
+  return out;
+}
+
+$("archivo-importar").addEventListener("change", async ev => {
+  const archivo = ev.target.files[0]; ev.target.value = "";
+  if (!archivo) return;
+  let datos;
+  cargando(true);
+  try {
+    datos = archivo.name.toLowerCase().endsWith(".db") ? await leerDbEscritorio(archivo) : JSON.parse(await archivo.text());
+    if (!Array.isArray(datos.prestamos)) throw new Error("Ese archivo no es una copia de la cartera.");
+  } catch(e){ cargando(false); return mostrarError(e); }
+  cargando(false);
+  const n = datos.prestamos.length, copiaClientes = Array.isArray(datos.clientes) ? datos.clientes : [];
+  if (!n && !copiaClientes.length) return alert("La copia no tiene préstamos ni clientes.");
+  if (!confirm(`Se van a AGREGAR ${n} préstamo(s) con su historial a tu cartera.\nLos clientes repetidos se unen en una sola ficha.\n\n(Si ya habías importado estos préstamos antes, quedarían repetidos.)\n\n¿Continuar?`)) return;
+  await accion(async () => {
+    const mapa = {}, mapaClientes = {};
+    for (const c of copiaClientes){
+      mapaClientes[c.id] = await obtenerOCrearCliente(c.nombre, c.telefono || "", c.direccion || "", c.notas || "");
+    }
+    for (const p of datos.prestamos){
+      const cli = mapaClientes[p.cliente_id] || await obtenerOCrearCliente(p.nombre, p.telefono || "");
+      const nuevo = await ok(sb.from("prestamos").insert({
+        cliente_id: cli.id, nombre: cli.nombre, telefono: cli.telefono || "", capital: Number(p.capital), tasa: Number(p.tasa), deuda: Number(p.deuda),
+        fecha_prestamo: String(p.fecha_prestamo).slice(0,10), fecha_pago: String(p.fecha_pago).slice(0,10),
+        estado: p.estado === "pagado" ? "pagado" : "activo", fecha_pagado: p.fecha_pagado ? String(p.fecha_pagado).slice(0,10) : null, notas: p.notas || ""
+      }).select().single());
+      mapa[p.id] = nuevo.id;
+    }
+    const movs = (datos.movimientos || []).filter(m => mapa[m.prestamo_id]).map(m => ({
+      prestamo_id: mapa[m.prestamo_id], fecha: String(m.fecha).slice(0,10), tipo: m.tipo, monto: Number(m.monto), detalle: m.detalle || ""
+    }));
+    for (let i = 0; i < movs.length; i += 200) await ok(sb.from("movimientos").insert(movs.slice(i, i + 200)));
+  }, `Se importaron ${n} préstamo(s)`);
+});
+
+// ---------------------------------------------------------------------
+// INICIO DE SESIÓN
+// ---------------------------------------------------------------------
+let modoRegistro = false;
+function mostrarLogin(){
+  usuario = null; prestamos = [];
+  $("app").classList.add("oculto"); $("pantalla-login").classList.remove("oculto");
+}
+async function entrarApp(sesion){
+  usuario = sesion.user;
+  $("pantalla-login").classList.add("oculto"); $("app").classList.remove("oculto");
+  cargando(true);
+  try { await cargarDatos(); } catch(e){ mostrarError(e); } finally { cargando(false); }
+}
+$("login-cambiar").onclick = () => {
+  modoRegistro = !modoRegistro;
+  $("login-boton").textContent = modoRegistro ? "Crear cuenta" : "Entrar";
+  $("login-sub").textContent = modoRegistro ? "Crea tu cuenta (solo la primera vez)" : "Inicia sesión para ver tu cartera";
+  $("login-cambiar").textContent = modoRegistro ? "Ya tengo cuenta, entrar" : "¿Primera vez? Crear mi cuenta";
+  $("login-clave").autocomplete = modoRegistro ? "new-password" : "current-password";
+  $("login-error").textContent = "";
+};
+$("form-login").onsubmit = async e => {
+  e.preventDefault();
+  const email = $("login-correo").value.trim(), password = $("login-clave").value;
+  $("login-error").textContent = ""; $("login-boton").disabled = true;
+  try {
+    if (modoRegistro){
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      if (!data.session){
+        $("login-error").textContent = "Cuenta creada. Revisa tu correo y abre el enlace de confirmación; luego vuelve aquí y entra.";
+        $("login-cambiar").click(); $("login-error").textContent = "Cuenta creada. Revisa tu correo, confirma y luego entra aquí.";
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    }
+  } catch(err){
+    let m = err.message || String(err);
+    if (/Invalid login credentials/i.test(m)) m = "Correo o contraseña incorrectos.";
+    else if (/Email not confirmed/i.test(m)) m = "Primero confirma tu correo (revisa tu bandeja de entrada o spam).";
+    else if (/Signups not allowed/i.test(m)) m = "El registro de cuentas nuevas está desactivado.";
+    else if (/Failed to fetch/i.test(m)) m = "Sin conexión a internet.";
+    $("login-error").textContent = m;
+  } finally { $("login-boton").disabled = false; }
+};
+
+// ---------------------------------------------------------------------
+// ARRANQUE
+// ---------------------------------------------------------------------
+$("btn-menu").onclick = abrirMenu;
+$("btn-nuevo").onclick = () => pestana === "clientes" ? editarCliente(null) : nuevoPrestamo();
+$("buscar").addEventListener("input", e => { filtro = e.target.value; pintar(); });
+
+(async function iniciar(){
+  const cfg = window.CARTERA_CONFIG || {};
+  if (!window.supabase || !cfg.SUPABASE_URL || /PEGA_AQUI/.test(cfg.SUPABASE_URL + cfg.SUPABASE_KEY)){
+    $("pantalla-config").classList.remove("oculto"); return;
+  }
+  sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY);
+  let enApp = false;
+  sb.auth.onAuthStateChange((evento, sesion) => {
+    if (sesion && !enApp){ enApp = true; entrarApp(sesion); }
+    else if (!sesion){ enApp = false; mostrarLogin(); }
+  });
+  const { data } = await sb.auth.getSession();
+  if (data.session){ if (!enApp){ enApp = true; entrarApp(data.session); } }
+  else mostrarLogin();
+})();
+</script>
+</body>
+</html>
