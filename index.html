@@ -120,6 +120,18 @@ table.hist td.m{text-align:right;font-weight:700;white-space:nowrap}
 .mini{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--borde);background:#fff;border-radius:12px;padding:10px 12px;text-align:left;font-size:14px}
 .sub a{color:var(--azul2)}
 
+/* Abonos, especiales y renovaciones */
+.btn.azul-suave{background:#e3ecf8;color:var(--azul)}
+.t-botones.tres .btn{padding:9px 4px}
+@media (max-width:420px){.t-botones.tres .btn{font-size:14px}.t-botones .largo{display:none}}
+.abonado{display:block;color:var(--verde)!important;font-weight:600}
+.tasa-chip{color:#8a5a00}
+.rapidos{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 6px}
+.rapidos .btn{padding:7px 10px;font-size:14px}
+.contador{display:flex;gap:8px;align-items:center}
+.contador input{width:90px;text-align:center;border:1px solid var(--borde);border-radius:12px;padding:10px;font-size:18px;font-weight:700}
+.contador .btn{width:48px;font-size:20px;padding:8px 0}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .caja{background:#fff;border:1px solid var(--borde);border-radius:18px;padding:24px 20px;width:100%;max-width:380px;text-align:center}
@@ -226,7 +238,12 @@ function diasEntre(desdeISO, hastaISO){
 }
 function fechaTxt(iso){ if(!iso) return "-"; const [a,m,d] = String(iso).slice(0,10).split("-"); return `${d}/${m}/${a}`; }
 function esc(t){ return String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function seccionDe(tasa){ return SECCIONES.find(s => s.tasa === Number(tasa)) || { tasa, titulo: tasa+"%", sub:"", dias: 7 }; }
+function seccionDe(tasa){ return SECCIONES.find(s => s.tasa === Number(tasa)) || { tasa, titulo: tasa+"%", sub:"", dias: 30 }; }
+const DIAS_ESPECIAL = 30;                                   // plazo sugerido para préstamos especiales
+const saldo   = p => Math.max(0, Number(p.deuda) - Number(p.abonado || 0));   // lo que debe hoy
+const plazoDe = p => Number(p.plazo_dias) || diasEntre(p.fecha_prestamo, p.fecha_pago) || seccionDe(p.tasa).dias;
+const fmtTasa = t => String(Number(t)).replace(".", ",") + "%";
+const etiquetaSeccion = p => p.especial ? `⭐ Especial ${fmtTasa(p.tasa)}` : `Sección ${fmtTasa(p.tasa)}`;
 
 function toast(msg, ms = 2600){
   const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
@@ -311,12 +328,13 @@ async function registrar(prestamo_id, tipo, monto, detalle, fecha){
 async function crearPrestamo(d){
   const deuda = Math.round(d.capital * (1 + d.tasa/100));
   const nuevo = await ok(sb.from("prestamos").insert({
+    especial: !!d.especial, plazo_dias: d.plazo_dias || null, abonado: 0,
     cliente_id: d.cliente_id, nombre: d.nombre, telefono: d.telefono, capital: d.capital, tasa: d.tasa, deuda,
     fecha_prestamo: d.fecha_prestamo, fecha_pago: d.fecha_pago, notas: d.notas, estado: "activo"
   }).select().single());
   await ok(sb.from("movimientos").insert([
-    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Préstamo", monto: d.capital, detalle: `Se prestaron ${pesos(d.capital)} al ${d.tasa}%` },
-    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Interés",  monto: deuda - d.capital, detalle: `Interés del ${d.tasa}%` },
+    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Préstamo", monto: d.capital, detalle: `Se prestaron ${pesos(d.capital)} al ${fmtTasa(d.tasa)}${d.especial ? " (especial)" : ""}` },
+    { prestamo_id: nuevo.id, fecha: d.fecha_prestamo, tipo: "Interés",  monto: deuda - d.capital, detalle: `Interés del ${fmtTasa(d.tasa)}` },
   ]));
 }
 async function accion(fn, mensaje){
@@ -332,17 +350,18 @@ async function accion(fn, mensaje){
 function pintar(){
   const activos = prestamos.filter(p => p.estado === "activo");
   $("tot-prestado").textContent = pesos(activos.reduce((s,p) => s + Number(p.capital), 0));
-  $("tot-cobrar").textContent   = pesos(activos.reduce((s,p) => s + Number(p.deuda), 0));
+  $("tot-cobrar").textContent   = pesos(activos.reduce((s,p) => s + saldo(p), 0));
 
   // pestañas
   $("pestanas").innerHTML = SECCIONES.map(s => {
-    const n = activos.filter(p => p.tasa === s.tasa).length;
+    const n = activos.filter(p => !p.especial && Number(p.tasa) === s.tasa).length;
     return `<button data-tab="${s.tasa}" class="${pestana===s.tasa?"activa":""}">${s.titulo} <small>· ${s.sub}</small> (${n})</button>`;
-  }).join("") + `<button data-tab="pagados" class="${pestana==="pagados"?"activa":""}">Pagados</button>`
+  }).join("") + `<button data-tab="especiales" class="${pestana==="especiales"?"activa":""}">⭐ Especiales (${activos.filter(p => p.especial).length})</button>`
+             + `<button data-tab="pagados" class="${pestana==="pagados"?"activa":""}">Pagados</button>`
              + `<button data-tab="clientes" class="${pestana==="clientes"?"activa":""}">👤 Clientes (${clientes.length})</button>`;
   $("pestanas").querySelectorAll("button").forEach(b => b.onclick = () => {
     const t = b.dataset.tab;
-    pestana = (t === "pagados" || t === "clientes") ? t : Number(t); pintar(); window.scrollTo({top:0});
+    pestana = ["pagados","clientes","especiales"].includes(t) ? t : Number(t); pintar(); window.scrollTo({top:0});
   });
   const activa = $("pestanas").querySelector(".activa"); activa && activa.scrollIntoView({ inline: "nearest", block: "nearest" });
 
@@ -356,7 +375,7 @@ function pintar(){
     $("resumen").innerHTML = `<div><small>Clientes registrados</small><b>${clientes.length}</b></div>
       <div><small>Con préstamo activo</small><b>${conActivo}</b></div>
       <div><small>Sin préstamo activo</small><b>${clientes.length - conActivo}</b></div>
-      <div><small>Han repetido</small><b>${clientes.filter(c => prestamosDe(c.id).length > 1).length}</b></div>`;
+      <div><small>Renovaciones (total)</small><b>${clientes.reduce((s,c) => s + Number(c.renovaciones || 0), 0)}</b></div>`;
     $("btn-nuevo").classList.remove("oculto");
     $("leyenda").textContent = "Todos tus clientes quedan guardados aquí aunque ya hayan pagado · Toca el nombre para ver su ficha";
     const vis = clientes.filter(c => !f || normal(c.nombre).includes(f) || (c.telefono||"").includes(filtro.trim()) || normal(c.direccion).includes(f));
@@ -365,14 +384,14 @@ function pintar(){
       const ultimo = ps.map(p => p.fecha_prestamo).sort().pop();
       const tel = (c.telefono||"").replace(/[^\d+]/g, "");
       const wa = tel ? (tel.startsWith("+") ? tel.slice(1) : (tel.length === 10 ? "57" + tel : tel)) : "";
-      const chip = act.length ? `<span class="chip pronto">${act.length} activo${act.length>1?"s":""} · debe ${pesos(act.reduce((s,p)=>s+Number(p.deuda),0))}</span>`
+      const chip = act.length ? `<span class="chip pronto">${act.length} activo${act.length>1?"s":""} · debe ${pesos(act.reduce((s,p)=>s+saldo(p),0))}</span>`
                               : `<span class="chip pagado">Al día</span>`;
       return `<article class="tarjeta ${act.length ? "pronto" : "pagado"}">
         <div class="t-arriba"><button class="t-nombre" data-cliente="${c.id}">${esc(c.nombre)}</button>${chip}</div>
-        <div class="t-tel">${tel ? `<a href="tel:${esc(tel)}">${esc(c.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : "Sin teléfono"}${c.direccion ? " · " + esc(c.direccion) : ""}</div>
+        <div class="t-tel">${tel ? `<a href="tel:${esc(tel)}">${esc(c.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : "Sin teléfono"}${c.direccion ? " · " + esc(c.direccion) : ""}${ultimo ? " · último préstamo " + fechaTxt(ultimo) : ""}</div>
         <div class="t-datos"><div><small>Préstamos</small><b>${ps.length}</b></div>
-          <div><small>Total prestado</small><b>${pesos(ps.reduce((s,p)=>s+Number(p.capital),0))}</b></div>
-          <div><small>Último préstamo</small><b>${fechaTxt(ultimo)}</b></div></div>
+          <div><small>Renovaciones</small><b>🔁 ${Number(c.renovaciones || 0)}</b></div>
+          <div><small>Total prestado</small><b>${pesos(ps.reduce((s,p)=>s+Number(p.capital),0))}</b></div></div>
         <div class="t-botones"><button class="btn primario" data-prestar="${c.id}">+ Préstamo</button>
           <button class="btn" data-cliente="${c.id}">Ver ficha</button></div>
       </article>`;
@@ -391,20 +410,24 @@ function pintar(){
     $("lista").innerHTML = vis.length ? vis.map(p => `
       <article class="tarjeta pagado">
         <div class="t-arriba"><button class="t-nombre" data-ver="${p.id}">${esc(p.nombre)}</button><span class="chip pagado">Pagó ${fechaTxt(p.fecha_pagado)}</span></div>
-        <div class="t-tel">Sección ${p.tasa}%${p.telefono ? " · " + esc(p.telefono) : ""}</div>
+        <div class="t-tel">${etiquetaSeccion(p)}${p.telefono ? " · " + esc(p.telefono) : ""}</div>
         <div class="t-datos"><div><small>Prestado</small><b>${pesos(p.capital)}</b></div>
           <div><small>Pagó</small><b>${pesos(p.deuda)}</b></div><div><small>Ganancia</small><b>${pesos(p.deuda-p.capital)}</b></div></div>
       </article>`).join("") : `<div class="vacio">${f ? "No hay resultados." : "Todavía no hay préstamos pagados."}</div>`;
   } else {
-    const sec = seccionDe(pestana);
-    const lista = activos.filter(p => p.tasa === pestana);
-    const prest = lista.reduce((s,p) => s + Number(p.capital), 0), cobr = lista.reduce((s,p) => s + Number(p.deuda), 0);
+    const esp = pestana === "especiales";
+    const sec = esp ? { titulo: "Especiales" } : seccionDe(pestana);
+    const lista = esp ? activos.filter(p => p.especial) : activos.filter(p => !p.especial && Number(p.tasa) === pestana);
+    const prest = lista.reduce((s,p) => s + Number(p.capital), 0), cobr = lista.reduce((s,p) => s + saldo(p), 0);
+    const total = lista.reduce((s,p) => s + Number(p.deuda), 0);
     $("resumen").innerHTML = `<div><small>Clientes activos</small><b>${lista.length}</b></div>
       <div><small>Total prestado</small><b>${pesos(prest)}</b></div>
       <div><small>Por cobrar</small><b>${pesos(cobr)}</b></div>
-      <div><small>Ganancia esperada</small><b>${pesos(cobr-prest)}</b></div>`;
+      <div><small>Ganancia esperada</small><b>${pesos(total-prest)}</b></div>`;
     $("btn-nuevo").classList.remove("oculto");
-    $("leyenda").textContent = "Rojo = vencido · Amarillo = vence hoy o mañana · Toca el nombre para ver el historial";
+    $("leyenda").textContent = esp
+      ? "Préstamos con el porcentaje y plazo que tú quieras · Toca el nombre para ver el historial o cambiar el porcentaje"
+      : "Rojo = vencido · Amarillo = vence hoy o mañana · Toca el nombre para ver el historial";
     const vis = lista.filter(coincide);
     $("lista").innerHTML = vis.length ? vis.map(p => {
       const dias = diasEntre(hoy, p.fecha_pago);
@@ -414,20 +437,26 @@ function pintar(){
       else if (dias === 1){ clase = "pronto"; chip = "Vence mañana"; }
       const tel = (p.telefono||"").replace(/[^\d+]/g, "");
       const wa = tel ? (tel.startsWith("+") ? tel.slice(1) : (tel.length === 10 ? "57" + tel : tel)) : "";
+      const lineas = [];
+      if (esp) lineas.push(`<b class="tasa-chip">⭐ ${fmtTasa(p.tasa)}</b> · plazo ${plazoDe(p)} días`);
+      if (tel) lineas.push(`<a href="tel:${esc(tel)}">${esc(p.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>`);
+      const abonado = Number(p.abonado || 0);
       return `<article class="tarjeta ${clase}">
         <div class="t-arriba"><button class="t-nombre" data-ver="${p.id}">${esc(p.nombre)}</button><span class="chip ${clase}">${chip}</span></div>
-        ${tel ? `<div class="t-tel"><a href="tel:${esc(tel)}">${esc(p.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a></div>` : ""}
+        ${lineas.length ? `<div class="t-tel">${lineas.join(" · ")}</div>` : ""}
         <div class="t-datos"><div><small>Prestado</small><b>${pesos(p.capital)}</b></div>
-          <div class="debe"><small>Debe pagar</small><b>${pesos(p.deuda)}</b></div>
+          <div class="debe"><small>Debe pagar</small><b>${pesos(saldo(p))}</b>${abonado ? `<small class="abonado">abonó ${pesos(abonado)}</small>` : ""}</div>
           <div><small>Fecha de pago</small><b>${fechaTxt(p.fecha_pago)}</b></div></div>
-        <div class="t-botones"><button class="btn verde" data-pagar="${p.id}">✔ Ya pagó</button>
-          <button class="btn suave-rojo" data-subir="${p.id}">▲ Subir deuda</button></div>
+        <div class="t-botones tres"><button class="btn verde" data-pagar="${p.id}">✔ Ya pagó</button>
+          <button class="btn azul-suave" data-abonar="${p.id}">$ Abonar</button>
+          <button class="btn suave-rojo" data-subir="${p.id}">▲ Subir<span class="largo"> deuda</span></button></div>
       </article>`;
-    }).join("") : `<div class="vacio">${f ? "No hay resultados." : `No hay clientes en la sección ${sec.titulo}.<br>Toca <b>+ Nuevo</b> para agregar uno.`}</div>`;
+    }).join("") : `<div class="vacio">${f ? "No hay resultados." : (esp ? "No hay préstamos especiales.<br>Toca <b>+ Nuevo</b> para prestar con el porcentaje que quieras." : `No hay clientes en la sección ${sec.titulo}.<br>Toca <b>+ Nuevo</b> para agregar uno.`)}</div>`;
   }
   $("lista").querySelectorAll("[data-ver]").forEach(b => b.onclick = () => verDetalle(Number(b.dataset.ver)));
   $("lista").querySelectorAll("[data-pagar]").forEach(b => b.onclick = () => marcarPagado(Number(b.dataset.pagar)));
   $("lista").querySelectorAll("[data-subir]").forEach(b => b.onclick = () => subirDeuda(Number(b.dataset.subir)));
+  $("lista").querySelectorAll("[data-abonar]").forEach(b => b.onclick = () => abonar(Number(b.dataset.abonar)));
   $("lista").querySelectorAll("[data-cliente]").forEach(b => b.onclick = () => verCliente(Number(b.dataset.cliente)));
   $("lista").querySelectorAll("[data-prestar]").forEach(b => b.onclick = () => nuevoPrestamo(Number(b.dataset.prestar)));
 }
@@ -437,13 +466,15 @@ const buscarP = id => prestamos.find(p => p.id === id);
 // ACCIONES
 // ---------------------------------------------------------------------
 function nuevoPrestamo(clienteId){
-  let tasa = typeof pestana === "number" ? pestana : 20;
+  let especial = pestana === "especiales";
+  let tasa = typeof pestana === "number" ? pestana : (especial ? 25 : 20);
   let elegido = clienteId ? clientePorId(clienteId) : null;
   abrirHoja(`
     <h2>Nuevo préstamo</h2>
     <form id="f" autocomplete="off">
       <span class="etiqueta">Sección</span>
-      <div class="segmento" id="f-secciones">${SECCIONES.map(s => `<button type="button" data-tasa="${s.tasa}">${s.titulo}<small>${s.sub}</small></button>`).join("")}</div>
+      <div class="segmento" id="f-secciones">${SECCIONES.map(s => `<button type="button" data-tasa="${s.tasa}">${s.titulo}<small>${s.sub}</small></button>`).join("")}<button type="button" data-tasa="esp">⭐ Especial<small>tú eliges</small></button></div>
+      <label class="campo oculto" id="f-tasa-caja"><span>Porcentaje de interés (%) *</span><input id="f-tasa" type="number" inputmode="decimal" min="0" step="0.5" placeholder="Ej: 25"></label>
       <div id="f-cliente"></div>
       <label class="campo"><span>¿Cuánto se le presta? *</span><input id="f-capital" inputmode="numeric" placeholder="Ej: 500.000" required></label>
       <label class="campo"><span>Fecha del préstamo</span><input id="f-fecha" type="date" value="${hoyISO()}" required></label>
@@ -456,15 +487,20 @@ function nuevoPrestamo(clienteId){
       const cap = q("#f-capital"); formatearCampoMonto(cap);
       const calc = () => {
         const c = leerMonto(cap.value), fe = q("#f-fecha").value, d = parseInt(q("#f-dias").value, 10);
-        q("#f-aviso").textContent = (c > 0 && fe && d > 0)
+        if (especial) tasa = parseFloat(String(q("#f-tasa").value).replace(",", ".")) || 0;
+        q("#f-aviso").textContent = (c > 0 && fe && d > 0 && (!especial || tasa > 0))
           ? `Debe pagar ${pesos(Math.round(c*(1+tasa/100)))} el ${fechaTxt(sumarDias(fe, d))}` : "";
       };
       const ponerSeccion = t => {
-        tasa = t; q("#f-dias").value = seccionDe(t).dias;
-        hoja.querySelectorAll("#f-secciones button").forEach(b => b.classList.toggle("activa", Number(b.dataset.tasa) === t));
+        especial = t === "esp";
+        q("#f-tasa-caja").classList.toggle("oculto", !especial);
+        q("#f-tasa").required = especial;
+        if (especial){ if (!q("#f-tasa").value) q("#f-tasa").value = 25; q("#f-dias").value = DIAS_ESPECIAL; }
+        else { tasa = Number(t); q("#f-dias").value = seccionDe(tasa).dias; }
+        hoja.querySelectorAll("#f-secciones button").forEach(b => b.classList.toggle("activa", b.dataset.tasa === String(t)));
         calc();
       };
-      hoja.querySelectorAll("#f-secciones button").forEach(b => b.onclick = () => ponerSeccion(Number(b.dataset.tasa)));
+      hoja.querySelectorAll("#f-secciones button").forEach(b => b.onclick = () => ponerSeccion(b.dataset.tasa));
 
       // --- Cliente: uno ya registrado o uno nuevo ---
       const pintarCliente = () => {
@@ -474,7 +510,8 @@ function nuevoPrestamo(clienteId){
           caja.innerHTML = `<div class="cliente-fijo"><div><small>Cliente registrado</small><b>${esc(elegido.nombre)}</b>
               <span>${esc(elegido.telefono || "Sin teléfono")}${elegido.direccion ? " · " + esc(elegido.direccion) : ""} · ${prestamosDe(elegido.id).length} préstamo(s) antes</span></div>
               <button type="button" class="btn" id="f-cambiar">Cambiar</button></div>
-            ${act.length ? `<div class="aviso rojo">Ojo: ya tiene ${act.length} préstamo(s) activo(s) por ${pesos(act.reduce((s,p)=>s+Number(p.deuda),0))}</div>` : ""}`;
+            ${act.length ? `<div class="aviso rojo">Ojo: ya tiene ${act.length} préstamo(s) activo(s) por ${pesos(act.reduce((s,p)=>s+saldo(p),0))}</div>` : ""}
+            ${prestamosDe(elegido.id).length ? `<div class="aviso">🔁 Este préstamo cuenta como renovación nº ${Number(elegido.renovaciones || 0) + 1}</div>` : ""}`;
           q("#f-cambiar").onclick = () => { elegido = null; pintarCliente(); q("#f-nombre").focus(); };
         } else {
           caja.innerHTML = `
@@ -495,8 +532,8 @@ function nuevoPrestamo(clienteId){
         }
       };
       pintarCliente();
-      ponerSeccion(tasa);
-      hoja.querySelectorAll("#f-capital,#f-fecha,#f-dias").forEach(i => i.addEventListener("input", calc));
+      ponerSeccion(especial ? "esp" : tasa);
+      hoja.querySelectorAll("#f-capital,#f-fecha,#f-dias,#f-tasa").forEach(i => i.addEventListener("input", calc));
       (elegido ? cap : q("#f-nombre")).focus();
 
       q("#f").onsubmit = async e => {
@@ -505,6 +542,8 @@ function nuevoPrestamo(clienteId){
         if (!elegido && !q("#f-nombre").value.trim()) return alert("Escribe el nombre del cliente.");
         if (!(capital > 0)) return alert("Escribe cuánto se le presta.");
         if (!fecha || !(dias > 0)) return alert("Revisa la fecha y el plazo.");
+        calc();
+        if (especial && !(tasa > 0)) return alert("Escribe el porcentaje de interés.");
         if (!elegido){
           const parecido = clienteParecido(q("#f-nombre").value, q("#f-tel").value);
           if (parecido && confirm(`Ya tienes registrado a "${parecido.nombre}" (${parecido.telefono || "sin teléfono"}).\n¿Es el mismo cliente?\n\nAceptar = usar ese cliente · Cancelar = crear uno nuevo`)) elegido = parecido;
@@ -514,10 +553,12 @@ function nuevoPrestamo(clienteId){
           if (!c){
             c = await ok(sb.from("clientes").insert({ nombre: q("#f-nombre").value.trim(), telefono: q("#f-tel").value.trim(), direccion: q("#f-dir").value.trim(), notas: "" }).select().single());
           }
-          await crearPrestamo({ cliente_id: c.id, nombre: c.nombre, telefono: c.telefono || "", capital, tasa,
+          const esRenovacion = prestamosDe(c.id).length > 0;
+          await crearPrestamo({ cliente_id: c.id, nombre: c.nombre, telefono: c.telefono || "", capital, tasa, especial, plazo_dias: dias,
             fecha_prestamo: fecha, fecha_pago: sumarDias(fecha, dias), notas: q("#f-notas").value.trim() });
+          if (esRenovacion) await ok(sb.from("clientes").update({ renovaciones: Number(c.renovaciones || 0) + 1 }).eq("id", c.id));
         }, "Préstamo guardado");
-        if (listo){ cerrarHoja(); if (pestana !== "clientes") pestana = tasa; pintar(); }
+        if (listo){ cerrarHoja(); if (pestana !== "clientes") pestana = especial ? "especiales" : tasa; pintar(); }
       };
   });
 }
@@ -534,16 +575,16 @@ function verCliente(id){
     <p class="sub">${tel ? `<a href="tel:${esc(tel)}">${esc(c.telefono)}</a> · <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : "Sin teléfono"}
       ${c.direccion ? `<br>📍 ${esc(c.direccion)}` : ""}${c.notas ? `<br>📝 ${esc(c.notas)}` : ""}</p>
     <div class="resumen" style="margin-top:0">
-      <div><small>Préstamos</small><b>${ps.length}</b></div>
-      <div><small>Activos</small><b>${act.length}</b></div>
+      <div><small>Préstamos (${act.length} activo${act.length===1?"":"s"})</small><b>${ps.length}</b></div>
+      <div><small>Renovaciones</small><b>🔁 ${Number(c.renovaciones || 0)}</b></div>
       <div><small>Total prestado</small><b>${pesos(ps.reduce((s,p)=>s+Number(p.capital),0))}</b></div>
       <div><small>Ganancia cobrada</small><b>${pesos(pag.reduce((s,p)=>s+(p.deuda-p.capital),0))}</b></div>
     </div>
     <span class="etiqueta">Historial de préstamos</span>
     <div class="mini-lista">${ps.length ? ps.map(p => `
       <button type="button" class="mini" data-ver-p="${p.id}">
-        <span><b>${pesos(p.capital)}</b> al ${p.tasa}% · ${fechaTxt(p.fecha_prestamo)}</span>
-        <span class="chip ${p.estado === "pagado" ? "pagado" : (diasEntre(hoyISO(), p.fecha_pago) < 0 ? "vencido" : "pronto")}">${p.estado === "pagado" ? "Pagó " + pesos(p.deuda) : "Debe " + pesos(p.deuda)}</span>
+        <span><b>${pesos(p.capital)}</b> al ${fmtTasa(p.tasa)}${p.especial ? " ⭐" : ""} · ${fechaTxt(p.fecha_prestamo)}</span>
+        <span class="chip ${p.estado === "pagado" ? "pagado" : (diasEntre(hoyISO(), p.fecha_pago) < 0 ? "vencido" : "pronto")}">${p.estado === "pagado" ? "Pagó " + pesos(p.deuda) : "Debe " + pesos(saldo(p))}</span>
       </button>`).join("") : `<div class="t-tel">Todavía no tiene préstamos.</div>`}</div>
     <div class="menu-lista">
       <button class="btn primario" id="c-prestar">+ Nuevo préstamo a ${esc(c.nombre.split(" ")[0])}</button>
@@ -563,7 +604,7 @@ function verCliente(id){
 }
 
 function editarCliente(id){
-  const c = id ? clientePorId(id) : { nombre: "", telefono: "", direccion: "", notas: "" };
+  const c = id ? clientePorId(id) : { nombre: "", telefono: "", direccion: "", notas: "", renovaciones: 0 };
   abrirHoja(`
     <h2>${id ? "Editar cliente" : "Nuevo cliente"}</h2>
     <form id="f" autocomplete="off">
@@ -571,13 +612,21 @@ function editarCliente(id){
       <label class="campo"><span>Teléfono</span><input id="e-tel" type="tel" inputmode="tel" value="${esc(c.telefono||"")}"></label>
       <label class="campo"><span>Dirección / barrio</span><input id="e-dir" value="${esc(c.direccion||"")}"></label>
       <label class="campo"><span>Notas</span><textarea id="e-notas" rows="3">${esc(c.notas||"")}</textarea></label>
+      <span class="etiqueta">🔁 Renovaciones (se suma 1 sola cada vez que le haces un préstamo nuevo)</span>
+      <div class="contador"><button type="button" class="btn" id="e-menos">−</button>
+        <input id="e-renov" type="number" inputmode="numeric" min="0" value="${Number(c.renovaciones || 0)}">
+        <button type="button" class="btn" id="e-mas">+</button></div>
       <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
     </form>`, hoja => {
+      const rv = hoja.querySelector("#e-renov");
+      hoja.querySelector("#e-menos").onclick = () => rv.value = Math.max(0, (parseInt(rv.value,10) || 0) - 1);
+      hoja.querySelector("#e-mas").onclick   = () => rv.value = (parseInt(rv.value,10) || 0) + 1;
       hoja.querySelector("#e-nombre").focus();
       hoja.querySelector("#f").onsubmit = async e => {
         e.preventDefault();
         const datos = { nombre: hoja.querySelector("#e-nombre").value.trim(), telefono: hoja.querySelector("#e-tel").value.trim(),
-                        direccion: hoja.querySelector("#e-dir").value.trim(), notas: hoja.querySelector("#e-notas").value.trim() };
+                        direccion: hoja.querySelector("#e-dir").value.trim(), notas: hoja.querySelector("#e-notas").value.trim(),
+                        renovaciones: Math.max(0, parseInt(rv.value, 10) || 0) };
         if (!datos.nombre) return alert("Escribe el nombre.");
         if (!id){
           const parecido = clienteParecido(datos.nombre, datos.telefono);
@@ -600,30 +649,76 @@ function editarCliente(id){
 
 async function marcarPagado(id){
   const p = buscarP(id); if (!p) return;
-  if (!confirm(`¿Confirmas que ${p.nombre} pagó ${pesos(p.deuda)}?\n\nPasará a la pestaña "Pagados".`)) return;
-  await accion(async () => {
-    await ok(sb.from("prestamos").update({ estado: "pagado", fecha_pagado: hoyISO() }).eq("id", id));
-    await registrar(id, "Pago", p.deuda, "Pagó la deuda completa");
-  }, `${p.nombre} quedó como pagado`);
+  if (!confirm(`¿Confirmas que ${p.nombre} pagó ${pesos(saldo(p))}?\n\nPasará a la pestaña "Pagados".`)) return;
+  await accion(() => registrarPagoFinal(p, "Pagó la deuda completa"), `${p.nombre} quedó como pagado`);
+}
+// El pago final NO se suma a "abonado": así, si se deshace el pago, el saldo vuelve a ser el correcto.
+async function registrarPagoFinal(p, detalle){
+  await ok(sb.from("prestamos").update({ estado: "pagado", fecha_pagado: hoyISO() }).eq("id", p.id));
+  await registrar(p.id, "Pago", saldo(p), detalle);
+}
+
+function abonar(id){
+  const p = buscarP(id); if (!p) return;
+  const debe = saldo(p);
+  abrirHoja(`
+    <h2>Abono de ${esc(p.nombre)}</h2>
+    <p class="sub">Debe hoy: <b>${pesos(debe)}</b>${Number(p.abonado||0) ? ` · Ya abonó: <b>${pesos(p.abonado)}</b>` : ""}<br>
+      Prestado ${pesos(p.capital)} al ${fmtTasa(p.tasa)} · paga el ${fechaTxt(p.fecha_pago)}</p>
+    <form id="f" autocomplete="off">
+      <label class="campo"><span>¿Cuánto abona? *</span><input id="a-monto" inputmode="numeric" placeholder="Ej: 50.000" required></label>
+      <div class="rapidos" id="a-rapidos">
+        ${[0.25, 0.5].map(x => Math.round(debe*x/1000)*1000).filter(v => v > 0 && v < debe).map(v => `<button type="button" class="btn" data-v="${v}">${pesos(v)}</button>`).join("")}
+        <button type="button" class="btn" data-v="${debe}">Todo (${pesos(debe)})</button>
+      </div>
+      <label class="campo"><span>Fecha de pago (puedes cambiarla si le das más plazo)</span><input id="a-fecha" type="date" value="${p.fecha_pago}"></label>
+      <div class="aviso" id="a-aviso"></div>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar abono</button></div>
+    </form>`, hoja => {
+      const m = hoja.querySelector("#a-monto"); formatearCampoMonto(m);
+      const calc = () => {
+        const v = leerMonto(m.value), av = hoja.querySelector("#a-aviso");
+        av.classList.remove("rojo");
+        if (!(v > 0)) return av.textContent = "";
+        if (v >= debe){ av.textContent = v > debe ? `Es más de lo que debe. Se registra ${pesos(debe)} y queda PAGADO ✔` : "Con este abono queda PAGADO ✔"; }
+        else av.textContent = `Después del abono queda debiendo ${pesos(debe - v)}`;
+      };
+      m.addEventListener("input", calc);
+      hoja.querySelectorAll("#a-rapidos [data-v]").forEach(b => b.onclick = () => { m.value = Number(b.dataset.v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); calc(); });
+      m.focus();
+      hoja.querySelector("#f").onsubmit = async e => {
+        e.preventDefault();
+        const v = leerMonto(m.value), nf = hoja.querySelector("#a-fecha").value || p.fecha_pago;
+        if (!(v > 0)) return alert("Escribe cuánto abona.");
+        const listo = await accion(async () => {
+          if (v >= debe){
+            await registrarPagoFinal(p, `Abono final de ${pesos(debe)}: quedó pagado`);
+          } else {
+            await ok(sb.from("prestamos").update({ abonado: Number(p.abonado || 0) + v, fecha_pago: nf }).eq("id", id));
+            await registrar(id, "Abono", v, `Abonó ${pesos(v)}. Queda debiendo ${pesos(debe - v)}${nf !== p.fecha_pago ? ". Nueva fecha: " + fechaTxt(nf) : ""}`);
+          }
+        }, v >= debe ? `${p.nombre} quedó como pagado` : "Abono guardado");
+        if (listo) cerrarHoja();
+      };
+  });
 }
 
 function subirDeuda(id){
   const p = buscarP(id); if (!p) return;
-  const sec = seccionDe(p.tasa);
   const recargo = Math.round(p.capital * p.tasa / 100);
   const base = p.fecha_pago > hoyISO() ? p.fecha_pago : hoyISO();
   abrirHoja(`
     <h2>Subir deuda a ${esc(p.nombre)}</h2>
-    <p class="sub">Prestado: <b>${pesos(p.capital)}</b> · Debe hoy: <b>${pesos(p.deuda)}</b><br>
-      Sugerido: otro ${p.tasa}% sobre lo prestado = ${pesos(recargo)} (puedes cambiarlo)</p>
+    <p class="sub">Prestado: <b>${pesos(p.capital)}</b> · Debe hoy: <b>${pesos(saldo(p))}</b><br>
+      Sugerido: otro ${fmtTasa(p.tasa)} sobre lo prestado = ${pesos(recargo)} (puedes cambiarlo)</p>
     <form id="f">
       <label class="campo"><span>¿Cuánto se le sube?</span><input id="s-monto" inputmode="numeric" value="${pesos(recargo).slice(1)}" required></label>
-      <label class="campo"><span>Nueva fecha de pago</span><input id="s-fecha" type="date" value="${sumarDias(base, sec.dias)}" required></label>
+      <label class="campo"><span>Nueva fecha de pago</span><input id="s-fecha" type="date" value="${sumarDias(base, plazoDe(p))}" required></label>
       <div class="aviso rojo" id="s-aviso"></div>
       <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn rojo" type="submit">Subir deuda</button></div>
     </form>`, hoja => {
       const m = hoja.querySelector("#s-monto"); formatearCampoMonto(m);
-      const calc = () => { const r = leerMonto(m.value); hoja.querySelector("#s-aviso").textContent = r >= 0 ? `Nueva deuda: ${pesos(Number(p.deuda) + r)}` : ""; };
+      const calc = () => { const r = leerMonto(m.value); hoja.querySelector("#s-aviso").textContent = r >= 0 ? `Nueva deuda: ${pesos(saldo(p) + r)}` : ""; };
       m.addEventListener("input", calc); calc();
       hoja.querySelector("#f").onsubmit = async e => {
         e.preventDefault();
@@ -647,18 +742,21 @@ async function verDetalle(id){
   const pagado = p.estado === "pagado";
   abrirHoja(`
     <h2>${esc(p.nombre)}</h2>
-    <p class="sub">Sección ${p.tasa}% · Tel: ${esc(p.telefono || "-")}<br>
-      Prestado: <b>${pesos(p.capital)}</b> · Deuda total: <b>${pesos(p.deuda)}</b> · ${pagado ? "PAGADO" : "Activo · paga el " + fechaTxt(p.fecha_pago)}
+    <p class="sub">${etiquetaSeccion(p)} · Tel: ${esc(p.telefono || "-")}<br>
+      Prestado: <b>${pesos(p.capital)}</b> · Total a cobrar: <b>${pesos(p.deuda)}</b>${Number(p.abonado||0) ? ` · Abonado: <b>${pesos(p.abonado)}</b>` : ""}<br>
+      ${pagado ? "PAGADO el " + fechaTxt(p.fecha_pagado) : `Debe hoy: <b>${pesos(saldo(p))}</b> · paga el ${fechaTxt(p.fecha_pago)}`}
       ${p.notas ? `<br>Notas: ${esc(p.notas)}` : ""}</p>
     <table class="hist">${movs.map(m => `<tr><td>${fechaTxt(m.fecha)}<br><small>${esc(m.tipo)}</small></td><td>${esc(m.detalle)}</td><td class="m">${pesos(m.monto)}</td></tr>`).join("") || "<tr><td>Sin movimientos</td></tr>"}</table>
     <div class="menu-lista">
       ${p.cliente_id ? `<button class="btn" id="d-cliente">👤 Ver ficha del cliente</button>` : ""}
       ${pagado ? `<button class="btn" id="d-reactivar">↩ Deshacer pago (volver a activo)</button>` : ""}
+      ${p.especial && !pagado ? `<button class="btn" id="d-tasa">⭐ Cambiar porcentaje o fecha de pago</button>` : ""}
       <button class="btn" id="d-editar">✏ Editar notas del préstamo</button>
       <button class="btn suave-rojo" id="d-borrar">🗑 Eliminar préstamo</button>
       <button class="btn" data-cerrar>Cerrar</button>
     </div>`, hoja => {
       hoja.querySelector("#d-editar").onclick = () => editar(id);
+      const dt = hoja.querySelector("#d-tasa"); if (dt) dt.onclick = () => editarTasa(id);
       const vc = hoja.querySelector("#d-cliente"); if (vc) vc.onclick = () => verCliente(p.cliente_id);
       const r = hoja.querySelector("#d-reactivar"); if (r) r.onclick = async () => {
         if (!confirm("¿Volver a poner este préstamo como NO pagado?")) return;
@@ -682,7 +780,7 @@ async function verDetalle(id){
 function editar(id){
   const p = buscarP(id); if (!p) return;
   abrirHoja(`
-    <h2>Notas del préstamo</h2><p class="sub">${esc(p.nombre)} · ${pesos(p.capital)} al ${p.tasa}%<br>Para cambiar nombre, teléfono o dirección usa la ficha del cliente.</p>
+    <h2>Notas del préstamo</h2><p class="sub">${esc(p.nombre)} · ${pesos(p.capital)} al ${fmtTasa(p.tasa)}<br>Para cambiar nombre, teléfono o dirección usa la ficha del cliente.</p>
     <form id="f">
       <label class="campo"><span>Notas</span><textarea id="e-notas" rows="3">${esc(p.notas||"")}</textarea></label>
       <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
@@ -690,6 +788,42 @@ function editar(id){
       hoja.querySelector("#f").onsubmit = async e => {
         e.preventDefault();
         const listo = await accion(() => ok(sb.from("prestamos").update({ notas: hoja.querySelector("#e-notas").value.trim() }).eq("id", id)), "Notas guardadas");
+        if (listo) cerrarHoja();
+      };
+  });
+}
+
+// Cambiar el porcentaje de un préstamo especial: la deuda se ajusta por la diferencia
+function editarTasa(id){
+  const p = buscarP(id); if (!p) return;
+  const vieja = Number(p.tasa);
+  abrirHoja(`
+    <h2>⭐ Cambiar porcentaje</h2>
+    <p class="sub">${esc(p.nombre)} · Prestado ${pesos(p.capital)} al ${fmtTasa(vieja)} · Debe hoy ${pesos(saldo(p))}</p>
+    <form id="f" autocomplete="off">
+      <label class="campo"><span>Nuevo porcentaje (%)</span><input id="t-tasa" type="number" inputmode="decimal" min="0" step="0.5" value="${vieja}" required></label>
+      <label class="campo"><span>Fecha de pago</span><input id="t-fecha" type="date" value="${p.fecha_pago}" required></label>
+      <div class="aviso" id="t-aviso"></div>
+      <div class="hoja-botones"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primario" type="submit">Guardar</button></div>
+    </form>`, hoja => {
+      const ti = hoja.querySelector("#t-tasa");
+      const nueva = () => parseFloat(String(ti.value).replace(",", "."));
+      const calc = () => {
+        const n = nueva(); if (!(n >= 0)) return hoja.querySelector("#t-aviso").textContent = "";
+        const dif = Math.round(p.capital * (n - vieja) / 100);
+        hoja.querySelector("#t-aviso").textContent = dif === 0 ? "La deuda no cambia" : `La deuda ${dif > 0 ? "sube" : "baja"} ${pesos(Math.abs(dif))} · quedaría debiendo ${pesos(Math.max(0, saldo(p) + dif))}`;
+      };
+      ti.addEventListener("input", calc); calc();
+      hoja.querySelector("#f").onsubmit = async e => {
+        e.preventDefault();
+        const n = nueva(), nf = hoja.querySelector("#t-fecha").value;
+        if (!(n >= 0) || !nf) return alert("Revisa el porcentaje y la fecha.");
+        const dif = Math.round(p.capital * (n - vieja) / 100);
+        const listo = await accion(async () => {
+          await ok(sb.from("prestamos").update({ tasa: n, deuda: Number(p.deuda) + dif, fecha_pago: nf }).eq("id", id));
+          if (dif !== 0 || nf !== p.fecha_pago)
+            await registrar(id, "Ajuste", Math.abs(dif), `Porcentaje ${fmtTasa(vieja)} → ${fmtTasa(n)}${dif ? (dif > 0 ? " (sube " : " (baja ") + pesos(Math.abs(dif)) + ")" : ""}${nf !== p.fecha_pago ? ". Fecha de pago: " + fechaTxt(nf) : ""}`);
+        }, "Préstamo actualizado");
         if (listo) cerrarHoja();
       };
   });
@@ -767,6 +901,7 @@ $("archivo-importar").addEventListener("change", async ev => {
       const nuevo = await ok(sb.from("prestamos").insert({
         cliente_id: cli.id, nombre: cli.nombre, telefono: cli.telefono || "", capital: Number(p.capital), tasa: Number(p.tasa), deuda: Number(p.deuda),
         fecha_prestamo: String(p.fecha_prestamo).slice(0,10), fecha_pago: String(p.fecha_pago).slice(0,10),
+        especial: !!p.especial, plazo_dias: p.plazo_dias || null, abonado: Number(p.abonado || 0),
         estado: p.estado === "pagado" ? "pagado" : "activo", fecha_pagado: p.fecha_pagado ? String(p.fecha_pagado).slice(0,10) : null, notas: p.notas || ""
       }).select().single());
       mapa[p.id] = nuevo.id;
@@ -775,6 +910,15 @@ $("archivo-importar").addEventListener("change", async ev => {
       prestamo_id: mapa[m.prestamo_id], fecha: String(m.fecha).slice(0,10), tipo: m.tipo, monto: Number(m.monto), detalle: m.detalle || ""
     }));
     for (let i = 0; i < movs.length; i += 200) await ok(sb.from("movimientos").insert(movs.slice(i, i + 200)));
+    // Renovaciones: lo que diga la copia, o (préstamos del cliente − 1), lo que sea mayor
+    const todos = await ok(sb.from("prestamos").select("id,cliente_id"));
+    const tocados = new Set([...Object.values(mapaClientes).map(c => c.id), ...datos.prestamos.map(p => mapa[p.id] && todos.find(t => t.id === mapa[p.id])?.cliente_id)].filter(Boolean));
+    for (const cid of tocados){
+      const c = clientePorId(cid) || {};
+      const deCopia = copiaClientes.filter(x => mapaClientes[x.id]?.id === cid).reduce((m, x) => Math.max(m, Number(x.renovaciones || 0)), 0);
+      const r = Math.max(Number(c.renovaciones || 0), deCopia, todos.filter(t => t.cliente_id === cid).length - 1);
+      if (r !== Number(c.renovaciones || 0)) await ok(sb.from("clientes").update({ renovaciones: r }).eq("id", cid));
+    }
   }, `Se importaron ${n} préstamo(s)`);
 });
 
